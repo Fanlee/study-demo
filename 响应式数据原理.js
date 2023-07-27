@@ -2,7 +2,7 @@
  * @Author: lihuan
  * @Date: 2023-07-26 21:42:32
  * @LastEditors: lihuan
- * @LastEditTime: 2023-07-27 22:43:13
+ * @LastEditTime: 2023-07-27 23:06:22
  * @Description:
  */
 
@@ -25,6 +25,7 @@ class Dep {
   }
 
   depend() {
+    console.log('depend')
     if (Dep.target) {
       // this.addSub(Dep.target)
       Dep.target.addDep(this)
@@ -282,3 +283,43 @@ Vue.prototype.$watch = function (expOrFn, cb, options) {
     watcher.teardown()
   }
 }
+
+function set(target, key, val) {
+  if (Array.isArray(target) && isValidArrayIndex(key)) {
+    target.length = Math.max(target.length, key)
+    target.splice(key, 1, val)
+    return val
+  }
+
+  if (key in target && !(key in Object.prototype)) {
+    target[key] = val
+    return val
+  }
+
+  const ob = target.__ob__
+  if (!ob) {
+    target[key] = val
+    return val
+  }
+  defineReactive(target, key, val)
+  ob.dep.notify()
+  return val
+}
+
+function del(target, key) {
+  if (Array.isArray(target) && isValidArrayIndex(key)) {
+    target.splice(key, 1)
+    return
+  }
+  const ob = target.__ob__
+  if (!hasOwn(target, key)) {
+    return
+  }
+  delete target[key]
+  if (!ob) return
+  ob.dep.notify()
+}
+
+const obj = { a: 1 }
+new Observer(obj)
+console.log(obj)
