@@ -6,8 +6,6 @@
  * @Description:
  */
 
-let vm = {}
-
 class Dep {
   constructor() {
     this.subs = []
@@ -22,8 +20,8 @@ class Dep {
   }
 
   depend() {
-    if (window.target) {
-      this.addSub(window.target)
+    if (Dep.target) {
+      this.addSub(Dep.target)
     }
   }
 
@@ -44,24 +42,47 @@ function remove(arr, item) {
   }
 }
 
-function defineReactive(data, key, val) {
-  if (typeof val === 'object') {
-    new Observer(val)
+function isObject(obj) {
+  return obj !== null && typeof obj === 'object'
+}
+
+const hasOwnProperty = Object.prototype.hasOwnProperty;
+function hasOwn(ob, key) {
+  return hasOwnProperty.call(obj, key)
+}
+
+function observe(value) {
+  if(!isObject(value)) {
+    return
   }
+  let ob
+  if(hasOwn(value, '__ob__') && value.__ob__ instanceof Observer) {
+    ob = value.__ob__
+  } else  {
+    ob = new Observer(value)
+  }
+  return ob
+}
+
+function defineReactive(data, key, val) {
+  let childOb = observe(val)
   let dep = new Dep() // 修改
   Object.defineProperty(data, key, {
     enumerable: true,
     configurable: true,
     get: function () {
       dep.depend() // 修改
+      if(childOb) {
+        childOb.dep.depend()
+      }
       return val
     },
     set: function (newVal) {
       if (val === newVal) {
         return
       }
-      val = newVal
       dep.notify() // 新增
+      val = newVal
     },
   })
 }
@@ -76,9 +97,9 @@ class Watcher {
   }
 
   get() {
-    window.target = this
+    Dep.target = this
     let value = this.getter.call(this.vm, this.vm)
-    window.target = undefined
+    Dep.target = undefined
     return value
   }
 
@@ -104,21 +125,6 @@ function parsePath(path) {
   }
 }
 
-class Observer {
-  constructor(value) {
-    this.value = value
-    if (!Array.isArray(value)) {
-      this.walk(value)
-    }
-  }
-  walk(obj) {
-    const keys = Object.keys(obj)
-    for (let i = 0; i < keys.length; i++) {
-      defineReactive(obj, keys[i], obj[keys[i]])
-    }
-  }
-}
-
 const arrayProto = Array.prototype
 const arrayMethods = Object.create(arrayProto)
 ;['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse'].forEach(
@@ -136,8 +142,55 @@ const arrayMethods = Object.create(arrayProto)
   }
 )
 
-Array.prototype = {}
-console.log(Array.prototype)
-let arr = []
+const hasProto = '__proto__' in Object
+const arrayKeys = Object.getOwnPropertyNames(arrayMethods)
 
-console.log(arr.push(1))
+function protoAugment(target, src ,keys) {
+  target.__proto__ = src
+}
+
+function copyAugment(target, src, keys) {
+  for(let i = 0; i < keys.length; i++) {
+    let key = keys[i]
+    def(target, key, src[key])
+  }
+}
+
+function def(obj, key, val) {
+  Object.defineProperty(obj, key, {
+    configurable: true,
+    enumerable:false,
+    writable: true,
+    value: val
+  })
+}
+
+class Observer {
+  constructor(value) {
+    this.value = value
+    this.dep = new Dep()
+    if (Array.isArray(value)) {
+      const augment = hasProto ? protoAugment : copyAugment
+      augment(value, arrayMethods, arrayKeys)
+      // if(augment) {
+      //   Object.setPrototypeOf(value, arrayMethods)
+      // }
+
+
+      // value.__proto__ = arrayMethods
+    } else {
+      this.walk(value)
+    }
+  }
+  walk(obj) {
+    const keys = Object.keys(obj)
+    for (let i = 0; i < keys.length; i++) {
+      defineReactive(obj, keys[i], obj[keys[i]])
+    }
+  }
+}
+
+
+let arr = []
+new Observer(arr)
+console.log(arr.push(2))
