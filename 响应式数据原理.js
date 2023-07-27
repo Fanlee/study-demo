@@ -2,12 +2,17 @@
  * @Author: lihuan
  * @Date: 2023-07-26 21:42:32
  * @LastEditors: lihuan
- * @LastEditTime: 2023-07-26 23:04:34
+ * @LastEditTime: 2023-07-27 22:43:13
  * @Description:
  */
 
+function Vue() {}
+
+let uid = 0
+
 class Dep {
   constructor() {
+    this.id = uid++
     this.subs = []
   }
 
@@ -21,7 +26,8 @@ class Dep {
 
   depend() {
     if (Dep.target) {
-      this.addSub(Dep.target)
+      // this.addSub(Dep.target)
+      Dep.target.addDep(this)
     }
   }
 
@@ -46,19 +52,19 @@ function isObject(obj) {
   return obj !== null && typeof obj === 'object'
 }
 
-const hasOwnProperty = Object.prototype.hasOwnProperty;
-function hasOwn(ob, key) {
+const hasOwnProperty = Object.prototype.hasOwnProperty
+function hasOwn(obj, key) {
   return hasOwnProperty.call(obj, key)
 }
 
 function observe(value) {
-  if(!isObject(value)) {
+  if (!isObject(value)) {
     return
   }
   let ob
-  if(hasOwn(value, '__ob__') && value.__ob__ instanceof Observer) {
+  if (hasOwn(value, '__ob__') && value.__ob__ instanceof Observer) {
     ob = value.__ob__
-  } else  {
+  } else {
     ob = new Observer(value)
   }
   return ob
@@ -72,12 +78,14 @@ function defineReactive(data, key, val) {
     configurable: true,
     get: function () {
       dep.depend() // 修改
-      if(childOb) {
+      if (childOb) {
+        console.log('child')
         childOb.dep.depend()
       }
       return val
     },
     set: function (newVal) {
+      console.log('set')
       if (val === newVal) {
         return
       }
@@ -87,11 +95,54 @@ function defineReactive(data, key, val) {
   })
 }
 
+const seenObjects = new Set()
+function traverse(val) {
+  _traverse(val, seenObjects)
+  seenObjects.clear()
+}
+
+function _traverse(val, seen) {
+  let i, keys
+  const isA = Array.isArray(val)
+  if ((!isA && !isObject(val)) || Object.isFrozen(val)) {
+    return
+  }
+  if (val.__ob__) {
+    const depId = val.__ob__.dep.id
+    if (seen.has(depId)) {
+      return
+    }
+    seen.add(depId)
+  }
+  if (isA) {
+    i = val.length
+    while (i--) {
+      _traverse(val[i], seen)
+    }
+  } else {
+    keys = Object.keys(val)
+    i = keys.length
+    while (i--) {
+      _traverse(val[keys[i]], seen)
+    }
+  }
+}
+
 class Watcher {
-  constructor(vm, expOrFn, cb) {
+  constructor(vm, expOrFn, cb, options) {
     this.vm = vm
-    // 执行this.getter()，就可以读取data.a.b.c的内容
-    this.getter = parsePath(expOrFn)
+    if (options) {
+      this.deep = !!options.deep
+    } else {
+      this.deep = false
+    }
+    this.deps = []
+    this.depIds = new Set()
+    if (typeof expOrFn === 'function') {
+      this.getter = expOrFn
+    } else {
+      this.getter = parsePath(expOrFn)
+    }
     this.cb = cb
     this.value = this.get()
   }
@@ -99,14 +150,32 @@ class Watcher {
   get() {
     Dep.target = this
     let value = this.getter.call(this.vm, this.vm)
+    if (this.deep) {
+      traverse(value)
+    }
     Dep.target = undefined
     return value
   }
 
   update() {
     const oldValue = this.value
+    console.log('watcher.update')
     this.value = this.get()
     this.cb.call(this.vm, this.value, oldValue)
+  }
+  addDep(dep) {
+    const id = dep.id
+    if (!this.depIds.has(id)) {
+      this.depIds.add(id)
+      this.deps.add(dep)
+      dep.addSub(this)
+    }
+  }
+  teardown() {
+    let i = this.deps.length
+    while (i--) {
+      this.deps[i].removeSub(this)
+    }
   }
 }
 
@@ -130,14 +199,25 @@ const arrayMethods = Object.create(arrayProto)
 ;['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse'].forEach(
   function (method) {
     const original = arrayProto[method]
-    Object.defineProperty(arrayMethods, method, {
-      enumerable: false,
-      configurable: true,
-      writable: true,
-      value: function mutator(...args) {
-        console.log(args)
-        return original.apply(this, args)
-      },
+    def(arrayMethods, method, function mutator(...args) {
+      const result = original.apply(this, args)
+      const ob = this.__ob__
+      let inserted
+      switch (method) {
+        case 'push':
+        case 'unshift':
+          inserted = args
+          break
+        case 'splice':
+          inserted = args.slice(2)
+        default:
+          break
+      }
+      if (inserted) {
+        ob.observeArray(inserted)
+      }
+      ob.dep.notify()
+      return result
     })
   }
 )
@@ -145,12 +225,12 @@ const arrayMethods = Object.create(arrayProto)
 const hasProto = '__proto__' in Object
 const arrayKeys = Object.getOwnPropertyNames(arrayMethods)
 
-function protoAugment(target, src ,keys) {
+function protoAugment(target, src, keys) {
   target.__proto__ = src
 }
 
 function copyAugment(target, src, keys) {
-  for(let i = 0; i < keys.length; i++) {
+  for (let i = 0; i < keys.length; i++) {
     let key = keys[i]
     def(target, key, src[key])
   }
@@ -159,9 +239,9 @@ function copyAugment(target, src, keys) {
 function def(obj, key, val) {
   Object.defineProperty(obj, key, {
     configurable: true,
-    enumerable:false,
+    enumerable: false,
     writable: true,
-    value: val
+    value: val,
   })
 }
 
@@ -169,15 +249,11 @@ class Observer {
   constructor(value) {
     this.value = value
     this.dep = new Dep()
+    def(value, '__ob__', this)
     if (Array.isArray(value)) {
       const augment = hasProto ? protoAugment : copyAugment
       augment(value, arrayMethods, arrayKeys)
-      // if(augment) {
-      //   Object.setPrototypeOf(value, arrayMethods)
-      // }
-
-
-      // value.__proto__ = arrayMethods
+      this.observeArray(value)
     } else {
       this.walk(value)
     }
@@ -188,9 +264,21 @@ class Observer {
       defineReactive(obj, keys[i], obj[keys[i]])
     }
   }
+  observeArray(items) {
+    for (let i = 0; i < items.length; i++) {
+      observe(items[i])
+    }
+  }
 }
 
-
-let arr = []
-new Observer(arr)
-console.log(arr.push(2))
+Vue.prototype.$watch = function (expOrFn, cb, options) {
+  const vm = this
+  options = options || {}
+  const watcher = new Watcher(vm, expOrFn, cb, options)
+  if (options.immediate) {
+    cb.call(vm, watcher.value)
+  }
+  return function unwatchFn() {
+    watcher.teardown()
+  }
+}
