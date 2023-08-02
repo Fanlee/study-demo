@@ -2,7 +2,7 @@
  * @Author: lihuan
  * @Date: 2023-07-26 21:42:32
  * @LastEditors: lihuan
- * @LastEditTime: 2023-07-26 23:04:34
+ * @LastEditTime: 2023-08-02 16:58:42
  * @Description:
  */
 
@@ -46,19 +46,19 @@ function isObject(obj) {
   return obj !== null && typeof obj === 'object'
 }
 
-const hasOwnProperty = Object.prototype.hasOwnProperty;
+const hasOwnProperty = Object.prototype.hasOwnProperty
 function hasOwn(ob, key) {
   return hasOwnProperty.call(obj, key)
 }
 
 function observe(value) {
-  if(!isObject(value)) {
+  if (!isObject(value)) {
     return
   }
   let ob
-  if(hasOwn(value, '__ob__') && value.__ob__ instanceof Observer) {
+  if (hasOwn(value, '__ob__') && value.__ob__ instanceof Observer) {
     ob = value.__ob__
-  } else  {
+  } else {
     ob = new Observer(value)
   }
   return ob
@@ -72,7 +72,7 @@ function defineReactive(data, key, val) {
     configurable: true,
     get: function () {
       dep.depend() // 修改
-      if(childOb) {
+      if (childOb) {
         childOb.dep.depend()
       }
       return val
@@ -145,12 +145,12 @@ const arrayMethods = Object.create(arrayProto)
 const hasProto = '__proto__' in Object
 const arrayKeys = Object.getOwnPropertyNames(arrayMethods)
 
-function protoAugment(target, src ,keys) {
+function protoAugment(target, src, keys) {
   target.__proto__ = src
 }
 
 function copyAugment(target, src, keys) {
-  for(let i = 0; i < keys.length; i++) {
+  for (let i = 0; i < keys.length; i++) {
     let key = keys[i]
     def(target, key, src[key])
   }
@@ -159,9 +159,9 @@ function copyAugment(target, src, keys) {
 function def(obj, key, val) {
   Object.defineProperty(obj, key, {
     configurable: true,
-    enumerable:false,
+    enumerable: false,
     writable: true,
-    value: val
+    value: val,
   })
 }
 
@@ -172,12 +172,6 @@ class Observer {
     if (Array.isArray(value)) {
       const augment = hasProto ? protoAugment : copyAugment
       augment(value, arrayMethods, arrayKeys)
-      // if(augment) {
-      //   Object.setPrototypeOf(value, arrayMethods)
-      // }
-
-
-      // value.__proto__ = arrayMethods
     } else {
       this.walk(value)
     }
@@ -189,7 +183,6 @@ class Observer {
     }
   }
 }
-
 
 let arr = []
 new Observer(arr)
