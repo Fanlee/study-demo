@@ -2,12 +2,15 @@
  * @Author: lihuan
  * @Date: 2023-08-07 15:31:35
  * @LastEditors: lihuan
- * @LastEditTime: 2023-08-08 11:08:08
+ * @LastEditTime: 2023-08-08 14:16:03
  * @Description:
  */
 const data = {
   foo: 1,
   bar: 2,
+  name: {
+    age: 30,
+  },
 }
 
 // 存储副作用函数的桶
@@ -137,13 +140,60 @@ function computed(getter) {
   return obj
 }
 
-const res = computed(() => {
-  return obj.foo + obj.bar
-})
+function traverse(value, seen = new Set()) {
+  if (typeof value !== 'object' || seen === null || seen.has(value)) {
+    return
+  }
+  seen.add(value)
+  for (const k in value) {
+    traverse(value[k], seen)
+  }
+  return value
+}
 
-effect(() => {
-  console.log(res.value)
-})
+function watch(source, cb, options = {}) {
+  let getter
+  if (typeof source === 'function') {
+    getter = source
+  } else {
+    getter = () => traverse(source)
+  }
+  let oldValue, newValue
+  let cleanup
+  function onInvalidate(fn) {
+    cleanup = fn
+  }
+  const job = () => {
+    newValue = effectFn()
+    if (cleanup) {
+      cleanup()
+    }
+    cb(newValue, oldValue, onInvalidate)
+    oldValue = newValue
+  }
+  const effectFn = effect(() => getter(), {
+    lazy: true,
+    scheduler() {
+      if (options.flush === 'post') {
+        Promise.resolve().then(job)
+      } else {
+        job()
+      }
+    },
+  })
 
-obj.foo++
-// console.log(res.value)
+  if (options.immediate) {
+    job()
+  } else {
+    oldValue = effectFn()
+  }
+}
+
+watch(
+  () => obj.foo,
+  (newVal, oldVal) => {
+    console.log('watch', newVal, oldVal)
+  }
+)
+
+obj.foo = 2
