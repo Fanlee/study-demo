@@ -2,16 +2,11 @@
  * @Author: lihuan
  * @Date: 2023-08-07 15:31:35
  * @LastEditors: lihuan
- * @LastEditTime: 2023-08-08 14:16:03
+ * @LastEditTime: 2023-08-08 17:42:53
  * @Description:
  */
-const data = {
-  foo: 1,
-  bar: 2,
-  name: {
-    age: 30,
-  },
-}
+
+const ITERATE_KEY = Symbol()
 
 // 存储副作用函数的桶
 const bucket = new WeakMap()
@@ -47,19 +42,107 @@ function cleanup(effectFn) {
   effectFn.deps.length = 0
 }
 
-const obj = new Proxy(data, {
-  get(target, key) {
-    // console.log('getter')
-    track(target, key)
-    // 返回属性值
-    return target[key]
-  },
-  set(target, key, newVal) {
-    // console.log('setter')
-    target[key] = newVal
-    trigger(target, key)
-  },
+const arrayInstrumentations = {}
+;['includes', 'indexOf', 'lastIndexOf'].forEach((method) => {
+  const originMethod = Array.prototype[method]
+  arrayInstrumentations[method] = function (...args) {
+    let res = originMethod.apply(this, args)
+    if (res === false || res === -1) {
+      res = originMethod.apply(this.raw, args)
+    }
+    return res
+  }
 })
+
+function createReactive(obj, isShallow = false, isReadonly = false) {
+  return new Proxy(obj, {
+    has(target, key) {
+      track(target, key)
+      return Reflect.has(target, key)
+    },
+    ownKeys(target) {
+      track(target, Array.isArray(target) ? 'length' : ITERATE_KEY)
+      return Reflect.ownKeys(target)
+    },
+    deleteProperty(target, key) {
+      if (isReadonly) {
+        console.log(`属性${key}是只读的`)
+        return true
+      }
+      const hasKey = Object.prototype.hasOwnProperty.call(target, key)
+      const res = Reflect.deleteProperty(target, key)
+      if (res && hasKey) {
+        trigger(target, key, 'DELETE')
+      }
+      return res
+    },
+    get(target, key, receiver) {
+      if (key === 'raw') {
+        return target
+      }
+
+      if (Array.isArray(target) && arrayInstrumentations.hasOwnProperty(key)) {
+        return Reflect.get(arrayInstrumentations, key, receiver)
+      }
+
+      if (!isReadonly && typeof key !== 'symbol') {
+        track(target, key)
+      }
+      const res = Reflect.get(target, key, receiver)
+
+      if (isShallow) return res
+
+      if (typeof res === 'object' && res !== null) {
+        return isReadonly ? readonly(res) : reactive(res)
+      }
+      return res
+    },
+    set(target, key, newVal, receiver) {
+      if (isReadonly) {
+        console.log(`属性${key}是只读的`)
+        return true
+      }
+      const oldVal = target[key]
+      const type = Array.isArray(target)
+        ? Number(key) < target.length
+          ? 'SET'
+          : 'ADD'
+        : Object.prototype.hasOwnProperty.call(target, key)
+        ? 'SET'
+        : 'ADD'
+      const res = Reflect.set(target, key, newVal, receiver)
+      if (target === receiver.raw) {
+        if (oldVal !== newVal && (oldVal === oldVal || newVal === newVal)) {
+          trigger(target, key, type, newVal)
+        }
+      }
+
+      return res
+    },
+  })
+}
+
+const reactiveMap = new Map()
+
+function reactive(obj) {
+  const existionProxy = reactiveMap.get(obj)
+  if (existionProxy) return existionProxy
+  const proxy = createReactive(obj)
+  reactiveMap.set(obj, proxy)
+  return proxy
+}
+
+function shallowReactive(obj) {
+  return createReactive(obj, true)
+}
+
+function readonly(obj) {
+  return createReactive(obj, false, true)
+}
+
+function shallowReadonly(obj) {
+  return createReactive(obj, true, true)
+}
 
 // 追踪变化
 function track(target, key) {
@@ -77,11 +160,12 @@ function track(target, key) {
 }
 
 // 触发变化
-function trigger(target, key) {
+function trigger(target, key, type, newVal) {
   let depsMap = bucket.get(target)
   if (!depsMap) return
   // 根据key获取所有副作用函数
   let effects = depsMap.get(key)
+  const iterateEffects = depsMap.get(ITERATE_KEY)
   const effectsToRun = new Set()
   effects &&
     effects.forEach((effectFn) => {
@@ -90,25 +174,43 @@ function trigger(target, key) {
       }
     })
 
+  if (type === 'ADD' || type === 'DELETE') {
+    iterateEffects &&
+      iterateEffects.forEach((effectFn) => {
+        if (activeEffect !== effectFn) {
+          effectsToRun.add(effectFn)
+        }
+      })
+  }
+
+  if (type === 'ADD' && Array.isArray(target)) {
+    const lengthEffects = depsMap.get('length')
+    lengthEffects &&
+      lengthEffects.forEach((effectFn) => {
+        if (activeEffect !== effectFn) {
+          effectsToRun.add(effectFn)
+        }
+      })
+  }
+
+  if (Array.isArray(target) && key === 'length') {
+    depsMap.forEach((effects, key) => {
+      if (key >= newVal) {
+        effects.forEach((effectFn) => {
+          if (activeEffect !== effectFn) {
+            effectsToRun.add(effectFn)
+          }
+        })
+      }
+    })
+  }
+
   effectsToRun.forEach((effectFn) => {
     if (effectFn.options.scheduler) {
       effectFn.options.scheduler(effectFn)
     } else {
       effectFn()
     }
-  })
-}
-
-const jobQueue = new Set()
-const p = Promise.resolve()
-let isFlushing = false
-function flushJob() {
-  if (isFlushing) return
-  isFlushing = true
-  p.then(() => {
-    jobQueue.forEach((job) => job())
-  }).finally(() => {
-    isFlushing = false
   })
 }
 
@@ -189,11 +291,13 @@ function watch(source, cb, options = {}) {
   }
 }
 
-watch(
-  () => obj.foo,
-  (newVal, oldVal) => {
-    console.log('watch', newVal, oldVal)
-  }
-)
+const o = {}
+const data = [o]
 
-obj.foo = 2
+const arr = reactive(data)
+
+effect(() => {
+  console.log(arr.includes(o))
+})
+// arr[1] = 'baz'
+// arr.length = 0
