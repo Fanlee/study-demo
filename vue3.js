@@ -2,7 +2,7 @@
  * @Author: lihuan
  * @Date: 2023-08-07 15:31:35
  * @LastEditors: lihuan
- * @LastEditTime: 2023-08-09 16:15:47
+ * @LastEditTime: 2023-08-09 17:19:06
  * @Description:
  */
 
@@ -182,7 +182,12 @@ function keysIterationMethod() {
   }
 }
 
-function createReactive(obj, isShallow = false, isReadonly = false) {
+function createReactive(
+  obj,
+  isShallow = false,
+  isReadonly = false,
+  isCollection
+) {
   return new Proxy(obj, {
     has(target, key) {
       track(target, key)
@@ -229,7 +234,7 @@ function createReactive(obj, isShallow = false, isReadonly = false) {
         return isReadonly ? readonly(res) : reactive(res)
       }
 
-      return mutableInstrumentations[key]
+      return isCollection ? mutableInstrumentations[key] : res
     },
     set(target, key, newVal, receiver) {
       if (isReadonly) {
@@ -258,12 +263,16 @@ function createReactive(obj, isShallow = false, isReadonly = false) {
 
 const reactiveMap = new Map()
 
-function reactive(obj) {
+function reactive(obj, isCollection = false) {
   const existionProxy = reactiveMap.get(obj)
   if (existionProxy) return existionProxy
-  const proxy = createReactive(obj)
+  const proxy = createReactive(obj, false, false, isCollection)
   reactiveMap.set(obj, proxy)
   return proxy
+}
+
+function collectionReactive(obj) {
+  reactive(obj, true)
 }
 
 function shallowReactive(obj) {
@@ -444,17 +453,62 @@ function watch(source, cb, options = {}) {
   }
 }
 
-const m = new Map([
-  ['key1', 'value1'],
-  ['key2', 'value2'],
-])
+function ref(val) {
+  const wrapper = {
+    value: val,
+  }
+  Object.defineProperty(wrapper, '__v_isRef', {
+    value: true,
+  })
+  return reactive(wrapper)
+}
 
-const p = reactive(m)
+function toRef(obj, key) {
+  const wrapper = {
+    get value() {
+      return obj[key]
+    },
+    set value(val) {
+      obj[key] = val
+    },
+  }
+  Object.defineProperty(wrapper, '__v_isRef', {
+    value: true,
+  })
+  return wrapper
+}
+
+function toRefs(obj) {
+  const ret = {}
+  for (let key in obj) {
+    ret[key] = toRef(obj, key)
+  }
+  return ret
+}
+
+function proxyRefs(target) {
+  return new Proxy(target, {
+    get(target, key, receiver) {
+      const value = Reflect.get(target, key, receiver)
+      return value.__v_isRef ? value.value : value
+    },
+    set(target, key, newVal, receiver) {
+      const value = target[key]
+      if (value.__v_isRef) {
+        value.value = newVal
+        return true
+      }
+      return Reflect.set(target, key, newVal, receiver)
+    },
+  })
+}
+
+const obj = reactive({ foo: 1, bar: 2 })
+
+const newObj = proxyRefs({ ...toRefs(obj) })
 
 effect(() => {
-  for (const key of p.keys()) {
-    console.log(key)
-  }
+  console.log(newObj.foo)
 })
 
-p.set('key3', 'value3')
+newObj.foo = 2
