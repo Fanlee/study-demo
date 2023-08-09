@@ -2,7 +2,7 @@
  * @Author: lihuan
  * @Date: 2023-08-07 15:31:35
  * @LastEditors: lihuan
- * @LastEditTime: 2023-08-08 17:42:53
+ * @LastEditTime: 2023-08-09 11:20:03
  * @Description:
  */
 
@@ -50,6 +50,18 @@ const arrayInstrumentations = {}
     if (res === false || res === -1) {
       res = originMethod.apply(this.raw, args)
     }
+    return res
+  }
+})
+
+// 表示是否进行追踪
+let shouldTrack = true
+;['push', 'pop', 'shift', 'unshift', 'splice'].forEach((method) => {
+  const originMethod = Array.prototype[method]
+  arrayInstrumentations[method] = function (...args) {
+    shouldTrack = false
+    let res = originMethod.apply(this, args)
+    shouldTrack = true
     return res
   }
 })
@@ -146,7 +158,7 @@ function shallowReadonly(obj) {
 
 // 追踪变化
 function track(target, key) {
-  if (!activeEffect) return target[key]
+  if (!activeEffect || !shouldTrack) return target[key]
   let depsMap = bucket.get(target)
   if (!depsMap) {
     bucket.set(target, (depsMap = new Map()))
@@ -291,13 +303,14 @@ function watch(source, cb, options = {}) {
   }
 }
 
-const o = {}
-const data = [o]
-
-const arr = reactive(data)
+const arr = reactive([])
 
 effect(() => {
-  console.log(arr.includes(o))
+  arr.push(1)
 })
-// arr[1] = 'baz'
-// arr.length = 0
+
+effect(() => {
+  arr.push(1)
+})
+
+console.log(arr)
