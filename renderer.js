@@ -2,7 +2,7 @@
  * @Author: lihuan
  * @Date: 2023-08-09 17:35:16
  * @LastEditors: lihuan
- * @LastEditTime: 2023-08-10 15:22:36
+ * @LastEditTime: 2023-08-10 16:33:00
  * @Description:
  */
 
@@ -30,7 +30,7 @@ function createRenderer(options) {
     setText,
   } = options
 
-  function mountElement(vnode, container) {
+  function mountElement(vnode, container, anchor) {
     const el = (vnode.el = createElement(vnode.type))
     // 子节点是 文本
     if (typeof vnode.children === 'string') {
@@ -45,7 +45,7 @@ function createRenderer(options) {
         patchProps(el, key, null, vnode.props[key])
       }
     }
-    insert(el, container)
+    insert(el, container, anchor)
   }
 
   function unmount(vnode) {
@@ -60,7 +60,7 @@ function createRenderer(options) {
     }
   }
 
-  function patch(n1, n2, container) {
+  function patch(n1, n2, container, anchor) {
     if (n1 && n1.type !== n2.type) {
       unmount(n1)
       n1 = null
@@ -71,7 +71,7 @@ function createRenderer(options) {
     if (typeof type === 'string') {
       // oldnode不存在，执行挂载操作
       if (!n1) {
-        mountElement(n2, container)
+        mountElement(n2, container, anchor)
       } else {
         patchElement(n1, n2)
       }
@@ -131,7 +131,52 @@ function createRenderer(options) {
       if (Array.isArray(n1.children)) {
         const oldChildren = n1.children
         const newChidren = n2.children
-        const oldLen = oldChildren.length
+        let lastIndex = 0
+        for (let i = 0; i < newChidren.length; i++) {
+          const newVnode = newChidren[i]
+          let j = 0
+          let find = false
+          for (j; j < oldChildren.length; j++) {
+            const oldVnode = oldChildren[j]
+            if (newVnode.key === oldVnode.key) {
+              find = true
+              patch(oldVnode, newVnode, container)
+              if (j < lastIndex) {
+                const prevNode = newChidren[i - 1]
+                // prevNode不存在则代表第一个节点
+                if (prevNode) {
+                  // 因为使用的是insertBefore的方式，所以需要取到nextSibling
+                  const anchor = prevNode.el.nextSibling
+                  insert(newVnode.el, container, anchor)
+                }
+              } else {
+                lastIndex = j
+              }
+              break
+            }
+          }
+          if (!find) {
+            const prevNode = newChidren[i - 1]
+            let anchor = null
+            if (prevNode) {
+              anchor = prevNode.el.nextSibling
+            } else {
+              anchor = container.firstChild
+            }
+            patch(null, newVnode, container, anchor)
+          }
+        }
+
+        // 循环旧的节点，如果在新节点中不存在，则需要删除
+        for (let i = 0; i < oldChildren.length; i++) {
+          const oldVNode = oldChildren[i]
+          const has = newChidren.find((vnode) => vnode.key === oldVNode.key)
+          if (!has) {
+            unmount(oldVNode)
+          }
+        }
+
+        /*         const oldLen = oldChildren.length
         const newLen = newChidren.length
         const commonLen = Math.min(oldLen, newLen)
 
@@ -149,7 +194,7 @@ function createRenderer(options) {
           for (let i = commonLen; i < oldLen; i++) {
             unmount(oldChildren[i])
           }
-        }
+        } */
       } else {
         setElementText(container, '')
         n2.children.forEach((child) => patch(null, child, container))
@@ -243,21 +288,23 @@ const renderer = createRenderer({
 const vnode1 = {
   type: 'div',
   children: [
-    { type: 'p', children: '1' },
-    { type: 'p', children: '2' },
-    // { type: 'p', children: '3' },
+    { type: 'p', children: '1', key: '1' },
+    { type: 'div', children: '2', key: '2' },
+    { type: 'span', children: '3', key: '3' },
   ],
 }
 
 const vnode2 = {
   type: 'div',
   children: [
-    { type: 'p', children: '4' },
-    { type: 'p', children: '5' },
-    { type: 'p', children: '6' },
+    { type: 'span', children: '4', key: '3' },
+    { type: 'p', children: '5', key: '1' },
+    // { type: 'div', children: '6', key: '2' },
   ],
 }
 
 renderer.render(vnode1, document.getElementById('app'))
 console.log('///////////')
-renderer.render(vnode2, document.getElementById('app'))
+setTimeout(() => {
+  renderer.render(vnode2, document.getElementById('app'))
+}, 1000)
