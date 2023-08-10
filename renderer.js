@@ -2,7 +2,7 @@
  * @Author: lihuan
  * @Date: 2023-08-09 17:35:16
  * @LastEditors: lihuan
- * @LastEditTime: 2023-08-10 16:33:00
+ * @LastEditTime: 2023-08-10 17:59:51
  * @Description:
  */
 
@@ -128,83 +128,139 @@ function createRenderer(options) {
 
       setElementText(container, n2.children)
     } else if (Array.isArray(n2.children)) {
-      if (Array.isArray(n1.children)) {
-        const oldChildren = n1.children
-        const newChidren = n2.children
-        let lastIndex = 0
-        for (let i = 0; i < newChidren.length; i++) {
-          const newVnode = newChidren[i]
-          let j = 0
-          let find = false
-          for (j; j < oldChildren.length; j++) {
-            const oldVnode = oldChildren[j]
-            if (newVnode.key === oldVnode.key) {
-              find = true
-              patch(oldVnode, newVnode, container)
-              if (j < lastIndex) {
-                const prevNode = newChidren[i - 1]
-                // prevNode不存在则代表第一个节点
-                if (prevNode) {
-                  // 因为使用的是insertBefore的方式，所以需要取到nextSibling
-                  const anchor = prevNode.el.nextSibling
-                  insert(newVnode.el, container, anchor)
-                }
-              } else {
-                lastIndex = j
-              }
-              break
-            }
-          }
-          if (!find) {
-            const prevNode = newChidren[i - 1]
-            let anchor = null
-            if (prevNode) {
-              anchor = prevNode.el.nextSibling
-            } else {
-              anchor = container.firstChild
-            }
-            patch(null, newVnode, container, anchor)
-          }
-        }
-
-        // 循环旧的节点，如果在新节点中不存在，则需要删除
-        for (let i = 0; i < oldChildren.length; i++) {
-          const oldVNode = oldChildren[i]
-          const has = newChidren.find((vnode) => vnode.key === oldVNode.key)
-          if (!has) {
-            unmount(oldVNode)
-          }
-        }
-
-        /*         const oldLen = oldChildren.length
-        const newLen = newChidren.length
-        const commonLen = Math.min(oldLen, newLen)
-
-        for (let i = 0; i < commonLen; i++) {
-          patch(oldChildren[i], newChidren[i], container)
-        }
-        // 需要新增节点
-        if (newLen > oldLen) {
-          for (let i = commonLen; i < newLen; i++) {
-            patch(null, newChidren[i], container)
-          }
-        }
-        // 需要删除节点
-        else if (newLen < oldLen) {
-          for (let i = commonLen; i < oldLen; i++) {
-            unmount(oldChildren[i])
-          }
-        } */
-      } else {
-        setElementText(container, '')
-        n2.children.forEach((child) => patch(null, child, container))
-      }
+      patchKeyedChildren(n1, n2, container)
     } else {
       if (Array.isArray(n1.children)) {
         n1.children.forEach((child) => unmount(child))
       } else if (typeof n1.children === 'string') {
         setElementText(container, '')
       }
+    }
+  }
+
+  function patchKeyedChildren(n1, n2, container) {
+    if (Array.isArray(n1.children)) {
+      const oldChildren = n1.children
+      const newChildren = n2.children
+      let oldStartIdx = 0
+      let oldEndIdx = oldChildren.length - 1
+      let newStartIdx = 0
+      let newEndIdx = newChildren.length - 1
+      let oldStartVNode = oldChildren[oldStartIdx]
+      let oldEndVNode = oldChildren[oldEndIdx]
+      let newStartVNode = newChildren[newStartIdx]
+      let newEndVNode = newChildren[newEndIdx]
+      while (oldStartIdx <= oldEndIdx && newStartIdx <= newEndIdx) {
+        if (!oldStartVNode) {
+          oldStartVNode = oldChildren[++oldStartIdx]
+        } else if (!oldEndVNode) {
+          oldEndVNode = oldChildren[--oldEndIdx]
+        } else if (oldStartVNode.key === newStartVNode.key) {
+          patch(oldStartVNode, newStartVNode, container)
+          oldStartVNode = oldChildren[++oldStartIdx]
+          newStartVNode = newChildren[++newStartIdx]
+        } else if (oldEndVNode.key === newEndVNode.key) {
+          patch(oldEndVNode, newEndVNode, container)
+          oldEndVNode = oldChildren[--oldEndIdx]
+          newEndVNode = newChildren[--newEndIdx]
+        } else if (oldStartVNode.key === newEndVNode.key) {
+          patch(oldStartVNode, newEndVNode, container)
+          insert(oldStartVNode.el, container, oldEndVNode.el.nextSibling)
+          oldStartVNode = oldChildren[++oldStartIdx]
+          newEndVNode = newChildren[--newEndIdx]
+        } else if (oldEndVNode.key === newStartVNode.key) {
+          patch(oldEndVNode, newStartVNode, container)
+          insert(oldEndVNode.el, container, oldStartVNode.el)
+          oldEndVNode = oldChildren[--oldEndIdx]
+          newStartVNode = newChildren[++newStartIdx]
+        } else {
+          // 拿新的头部节点去旧的节点里面查找
+          const idxInOld = oldChildren.findIndex(
+            (node) => node.key === newStartVNode.key
+          )
+          if (idxInOld > 0) {
+            const vnodeToMove = oldChildren[idxInOld]
+            patch(vnodeToMove, newStartVNode, container)
+            insert(vnodeToMove.el, container, oldStartVNode.el)
+            oldChildren[idxInOld] = undefined
+          } else {
+            patch(null, newStartVNode, container, oldStartVNode.el)
+          }
+          newStartVNode = newChildren[++newStartIdx]
+        }
+      }
+
+      if (oldEndIdx < oldStartIdx && newStartIdx <= newEndIdx) {
+      }
+
+      //////////////
+      // let lastIndex = 0
+      // for (let i = 0; i < newChildren.length; i++) {
+      //   const newVnode = newChildren[i]
+      //   let j = 0
+      //   let find = false
+      //   for (j; j < oldChildren.length; j++) {
+      //     const oldVnode = oldChildren[j]
+      //     if (newVnode.key === oldVnode.key) {
+      //       find = true
+      //       patch(oldVnode, newVnode, container)
+      //       if (j < lastIndex) {
+      //         const prevNode = newChildren[i - 1]
+      //         // prevNode不存在则代表第一个节点
+      //         if (prevNode) {
+      //           // 因为使用的是insertBefore的方式，所以需要取到nextSibling
+      //           const anchor = prevNode.el.nextSibling
+      //           insert(newVnode.el, container, anchor)
+      //         }
+      //       } else {
+      //         lastIndex = j
+      //       }
+      //       break
+      //     }
+      //   }
+      //   if (!find) {
+      //     const prevNode = newChildren[i - 1]
+      //     let anchor = null
+      //     if (prevNode) {
+      //       anchor = prevNode.el.nextSibling
+      //     } else {
+      //       anchor = container.firstChild
+      //     }
+      //     patch(null, newVnode, container, anchor)
+      //   }
+      // }
+
+      // // 循环旧的节点，如果在新节点中不存在，则需要删除
+      // for (let i = 0; i < oldChildren.length; i++) {
+      //   const oldVNode = oldChildren[i]
+      //   const has = newChidren.find((vnode) => vnode.key === oldVNode.key)
+      //   if (!has) {
+      //     unmount(oldVNode)
+      //   }
+      // }
+
+      /*         const oldLen = oldChildren.length
+      const newLen = newChidren.length
+      const commonLen = Math.min(oldLen, newLen)
+
+      for (let i = 0; i < commonLen; i++) {
+        patch(oldChildren[i], newChidren[i], container)
+      }
+      // 需要新增节点
+      if (newLen > oldLen) {
+        for (let i = commonLen; i < newLen; i++) {
+          patch(null, newChidren[i], container)
+        }
+      }
+      // 需要删除节点
+      else if (newLen < oldLen) {
+        for (let i = commonLen; i < oldLen; i++) {
+          unmount(oldChildren[i])
+        }
+      } */
+    } else {
+      setElementText(container, '')
+      n2.children.forEach((child) => patch(null, child, container))
     }
   }
 
@@ -299,7 +355,7 @@ const vnode2 = {
   children: [
     { type: 'span', children: '4', key: '3' },
     { type: 'p', children: '5', key: '1' },
-    // { type: 'div', children: '6', key: '2' },
+    { type: 'div', children: '6', key: '2' },
   ],
 }
 
