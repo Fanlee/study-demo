@@ -2,9 +2,11 @@
  * @Author: lihuan
  * @Date: 2023-08-09 17:35:16
  * @LastEditors: lihuan
- * @LastEditTime: 2023-08-11 15:10:17
+ * @LastEditTime: 2023-08-11 17:18:12
  * @Description:
  */
+
+const { reactive, effect } = VueReactivity
 
 // 文本节点类型
 const Text = Symbol()
@@ -98,7 +100,72 @@ function createRenderer(options) {
     }
     // 描述的是组件
     else if (typeof type === 'object') {
+      if (!n1) {
+        mountComponent(n2, container, anchor)
+      } else {
+        patchComponent(n1, n2, anchor)
+      }
     }
+  }
+
+  const queue = new Set()
+  let isFlushing = false
+  const p = Promise.resolve()
+
+  function queueJob(job) {
+    queue.add(job)
+    if (!isFlushing) {
+      isFlushing = true
+      p.then(() => {
+        queue.forEach((job) => job())
+      }).finally(() => {
+        isFlushing = false
+        queue.clear = 0
+      })
+    }
+  }
+
+  function mountComponent(vnode, container, anchor) {
+    const componentOptions = vnode.type
+    const {
+      render,
+      data,
+      beforeCreate,
+      created,
+      beforeMount,
+      mounted,
+      beforeUpdate,
+
+      updated,
+    } = componentOptions
+    beforeCreate && beforeCreate()
+    const state = reactive(data())
+    const instance = {
+      state,
+      isMounted: false,
+      subTree: null,
+    }
+    vnode.component = instance
+    created && created.call(state)
+    effect(
+      () => {
+        const subTree = render.call(state, state)
+        if (!instance.isMounted) {
+          beforeMount && beforeMount.call(state)
+          patch(null, subTree, container, anchor)
+          instance.isMounted = true
+          mounted && mounted.call(state)
+        } else {
+          beforeUpdate && beforeUpdate.call(state)
+          patch(instance.subTree, subTree, container, anchor)
+          updated && updated.call(state)
+        }
+        instance.subTree = subTree
+      },
+      {
+        scheduler: queueJob,
+      }
+    )
   }
 
   function patchElement(n1, n2) {
@@ -139,7 +206,7 @@ function createRenderer(options) {
   }
 
   // 简单diff算法
-  function patchKeyedChildren(n1, n2, container) {
+  function patchKeyedChildren1(n1, n2, container) {
     const oldChildren = n1.children
     const newChildren = n2.children
     let lastIndex = 0
@@ -209,7 +276,7 @@ function createRenderer(options) {
   }
 
   // 双端diff算法
-  function patchKeyedChildren1(n1, n2, container) {
+  function patchKeyedChildren(n1, n2, container) {
     if (Array.isArray(n1.children)) {
       const oldChildren = n1.children
       const newChildren = n2.children
@@ -442,26 +509,29 @@ const renderer = createRenderer({
   },
 })
 
-const vnode1 = {
-  type: 'div',
-  children: [
-    { type: 'p', children: '1', key: '1' },
-    { type: 'div', children: '2', key: '2' },
-    { type: 'span', children: '3', key: '3' },
-  ],
+const MyComponent = {
+  name: 'MyComponent',
+  data() {
+    return {
+      foo: 0,
+    }
+  },
+  render(vm) {
+    return {
+      type: 'div',
+      props: {
+        onClick() {
+          console.log(1, vm.foo)
+          vm.foo++
+        },
+      },
+      children: `文本 ${this.foo}`,
+    }
+  },
 }
 
-const vnode2 = {
-  type: 'div',
-  children: [
-    { type: 'span', children: '4', key: '3' },
-    { type: 'p', children: '5', key: '1' },
-    { type: 'div', children: '6', key: '2' },
-  ],
+const CompVNode = {
+  type: MyComponent,
 }
 
-renderer.render(vnode1, document.getElementById('app'))
-console.log('///////////')
-setTimeout(() => {
-  renderer.render(vnode2, document.getElementById('app'))
-}, 1000)
+renderer.render(CompVNode, document.getElementById('app'))
