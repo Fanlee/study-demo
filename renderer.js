@@ -2,7 +2,7 @@
  * @Author: lihuan
  * @Date: 2023-08-09 17:35:16
  * @LastEditors: lihuan
- * @LastEditTime: 2023-08-11 17:18:12
+ * @LastEditTime: 2023-08-14 15:16:11
  * @Description:
  */
 
@@ -130,18 +130,20 @@ function createRenderer(options) {
     const {
       render,
       data,
+      props: propsOption,
       beforeCreate,
       created,
       beforeMount,
       mounted,
       beforeUpdate,
-
       updated,
     } = componentOptions
     beforeCreate && beforeCreate()
     const state = reactive(data())
+    const [props, attrs] = resolveProps(propsOption, vnode.props)
     const instance = {
       state,
+      props: shallowReactive(props),
       isMounted: false,
       subTree: null,
     }
@@ -166,6 +168,11 @@ function createRenderer(options) {
         scheduler: queueJob,
       }
     )
+  }
+
+  function resolveProps(options, propsData) {
+    const props = {}
+    const attrs = {}
   }
 
   function patchElement(n1, n2) {
@@ -511,27 +518,22 @@ const renderer = createRenderer({
 
 const MyComponent = {
   name: 'MyComponent',
-  data() {
-    return {
-      foo: 0,
-    }
+  props: {
+    title: String,
   },
   render(vm) {
     return {
       type: 'div',
-      props: {
-        onClick() {
-          console.log(1, vm.foo)
-          vm.foo++
-        },
-      },
-      children: `文本 ${this.foo}`,
+      children: `文本 ${this.title}`,
     }
   },
 }
 
 const CompVNode = {
   type: MyComponent,
+  props: {
+    title: 'A big Title',
+  },
 }
 
 renderer.render(CompVNode, document.getElementById('app'))
