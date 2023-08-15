@@ -2,7 +2,7 @@
  * @Author: lihuan
  * @Date: 2023-08-09 17:35:16
  * @LastEditors: lihuan
- * @LastEditTime: 2023-08-14 15:16:11
+ * @LastEditTime: 2023-08-15 15:48:53
  * @Description:
  */
 
@@ -34,7 +34,7 @@ function createRenderer(options) {
 
   function mountElement(vnode, container, anchor) {
     const el = (vnode.el = createElement(vnode.type))
-    // 子节点是 文本
+    // 子节点是文本
     if (typeof vnode.children === 'string') {
       setElementText(el, vnode.children)
     } else if (Array.isArray(vnode.children)) {
@@ -170,9 +170,38 @@ function createRenderer(options) {
     )
   }
 
+  function patchComponent(n1, n2, anchor) {
+    const instance = (n2.component = n1.component)
+    const { props } = instance
+    if (hasPropsChanged(n1.props, n2.props)) {
+      const [nextProps] = resolveProps(n2.type.props, n2.props)
+      for (const k in nextProps) {
+        props[k] = nextProps[k]
+      }
+
+      for (const key in props) {
+        if (!(k in nextProps)) {
+          delete props[k]
+        }
+      }
+    }
+  }
+
+  function hasPropsChanged(prevProps, nextProps) {
+    // const nextKeys =
+  }
+
   function resolveProps(options, propsData) {
     const props = {}
     const attrs = {}
+    for (const key in propsData) {
+      if (key in options) {
+        props[key] = propsData[key]
+      } else {
+        attrs[key] = propsData[key]
+      }
+    }
+    return [props, attrs]
   }
 
   function patchElement(n1, n2) {
