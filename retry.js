@@ -1,3 +1,10 @@
+/*
+ * @Author: lihuan
+ * @Date: 2023-08-16 10:05:21
+ * @LastEditors: lihuan
+ * @LastEditTime: 2023-08-18 13:26:38
+ * @Description:
+ */
 function fetch() {
   return new Promise((resolve, reject) => {
     setTimeout(() => {
@@ -18,5 +25,5 @@ function load(onError) {
 }
 
 load((retry, fail) => {
-  fail()
+  retry()
 }).then((res) => console.log(res))
