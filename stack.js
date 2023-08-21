@@ -1,3 +1,10 @@
+/*
+ * @Author: lihuan
+ * @Date: 2023-08-18 15:33:12
+ * @LastEditors: lihuan
+ * @LastEditTime: 2023-08-21 11:03:24
+ * @Description:
+ */
 class Stack {
   constructor() {
     this.items = {}
@@ -16,7 +23,7 @@ class Stack {
   }
   peek() {
     if (this.isEmpty()) return
-    return this.items[--this.count]
+    return this.items[this.count - 1]
   }
   size() {
     return this.count
