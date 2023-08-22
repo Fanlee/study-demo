@@ -2,11 +2,24 @@
  * @Author: lihuan
  * @Date: 2023-08-21 14:30:37
  * @LastEditors: lihuan
- * @LastEditTime: 2023-08-22 10:40:38
+ * @LastEditTime: 2023-08-22 11:06:58
  * @Description: 链表
  */
 
-const { defaultEquals } = require('./util')
+// const { defaultEquals } = require('./util')
+function defaultEquals(a, b) {
+  return a === b
+}
+
+const Compare = {
+  LESS_THAN: 1,
+  BIGGER_THAN: -1,
+}
+
+function defaultCompare(a, b) {
+  if (a === b) return 0
+  return a < b ? Compare.LESS_THAN : Compare.BIGGER_THAN
+}
 
 class Node {
   constructor(element) {
@@ -237,8 +250,34 @@ class CircularLinkedList extends LinkedList {
   }
 }
 
-const c = new CircularLinkedList()
-c.insert(1, 0)
-// c.insert(2, 1)
+class SortedLinkedList extends LinkedList {
+  constructor(equalsFn = defaultEquals, compareFn = defaultCompare) {
+    super(equalsFn)
+    this.compareFn = compareFn
+  }
+  insert(element, index = 0) {
+    if (this.isEmpty()) {
+      return super.insert(element, index)
+    }
+    const pos = this.getIndexNextSortedElement(element)
+    return super.insert(element, pos)
+  }
+  getIndexNextSortedElement(element) {
+    let current = this.head
+    let i = 0
+    for (; i < this.size() && current; i++) {
+      const comp = this.compareFn(element, current.element)
+      if (comp === Compare.LESS_THAN) {
+        return i
+      }
+      current = current.next
+    }
+    return i
+  }
+}
 
+const c = new SortedLinkedList()
+c.insert(2)
+c.insert(1)
+c.insert(9)
 console.log(c)
