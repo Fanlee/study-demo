@@ -2,7 +2,7 @@
  * @Author: lihuan
  * @Date: 2023-08-21 14:30:37
  * @LastEditors: lihuan
- * @LastEditTime: 2023-08-23 14:01:36
+ * @LastEditTime: 2023-08-23 14:34:21
  * @Description: 链表
  */
 
@@ -86,7 +86,7 @@ export class LinkedList {
       if (this.equalsFn(element, current.element)) {
         return i
       }
-      current = current.next()
+      current = current.next
     }
     return -1
   }
