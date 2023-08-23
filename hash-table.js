@@ -2,7 +2,7 @@
  * @Author: lihuan
  * @Date: 2023-08-23 10:35:48
  * @LastEditors: lihuan
- * @LastEditTime: 2023-08-23 15:18:13
+ * @LastEditTime: 2023-08-23 17:10:18
  * @Description: 散列表
  */
 
@@ -200,19 +200,3 @@ class HashTableLinearProbing extends HashTable {
     }
   }
 }
-
-const hash = new HashTableSeparateChaining()
-hash.put('Ygritte', 'ygritte@email.com')
-hash.put('Jonathan', 'jonathan@email.com')
-hash.put('Jamie', 'jamie@email.com')
-hash.put('Jack', 'jack@email.com')
-hash.put('Jasmine', 'jasmine@email.com')
-hash.put('Jake', 'jake@email.com')
-hash.put('Nathan', 'nathan@email.com')
-hash.put('Athelstan', 'athelstan@email.com')
-hash.put('Sue', 'sue@email.com')
-hash.put('Aethelwulf', 'aethelwulf@email.com')
-hash.put('Sargeras', 'sargeras@email.com')
-console.log(hash)
-console.log(hash.remove('Sue'))
-console.log(hash)
