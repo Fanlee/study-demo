@@ -2,7 +2,7 @@
  * @Author: lihuan
  * @Date: 2023-08-21 14:30:37
  * @LastEditors: lihuan
- * @LastEditTime: 2023-08-22 11:06:58
+ * @LastEditTime: 2023-08-23 14:01:36
  * @Description: 链表
  */
 
@@ -28,7 +28,7 @@ class Node {
   }
 }
 
-class LinkedList {
+export class LinkedList {
   constructor(equalsFn = defaultEquals) {
     this.count = 0
     this.head = null
@@ -127,14 +127,14 @@ class LinkedList {
   }
 }
 
-class DoublyNode extends Node {
+export class DoublyNode extends Node {
   constructor(element, next, prev) {
     super(element, next)
     this.prev = prev
   }
 }
 
-class DoublyLinkedList extends LinkedList {
+export class DoublyLinkedList extends LinkedList {
   constructor(equalsFn = defaultEquals) {
     super(equalsFn)
     this.tail = undefined
@@ -197,7 +197,7 @@ class DoublyLinkedList extends LinkedList {
   }
 }
 
-class CircularLinkedList extends LinkedList {
+export class CircularLinkedList extends LinkedList {
   constructor(equalsFn = defaultEquals) {
     super(equalsFn)
   }
@@ -250,7 +250,7 @@ class CircularLinkedList extends LinkedList {
   }
 }
 
-class SortedLinkedList extends LinkedList {
+export class SortedLinkedList extends LinkedList {
   constructor(equalsFn = defaultEquals, compareFn = defaultCompare) {
     super(equalsFn)
     this.compareFn = compareFn
@@ -275,9 +275,3 @@ class SortedLinkedList extends LinkedList {
     return i
   }
 }
-
-const c = new SortedLinkedList()
-c.insert(2)
-c.insert(1)
-c.insert(9)
-console.log(c)
