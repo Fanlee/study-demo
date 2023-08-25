@@ -2,7 +2,7 @@
  * @Author: lihuan
  * @Date: 2023-08-23 16:43:51
  * @LastEditors: lihuan
- * @LastEditTime: 2023-08-25 15:36:01
+ * @LastEditTime: 2023-08-25 16:27:33
  * @Description: 树
  */
 import { BalanceFactor, Compare, defaultCompare } from './util.js'
@@ -226,60 +226,36 @@ export class AVLTree extends BinarySearchTree {
     return node
   }
   removeNode(node, key) {
-    node = super.removeNode(node, key) // {1}
+    node = super.removeNode(node, key)
     if (node == null) {
       return node // null，不需要进行平衡
     }
     // 检测树是否平衡
-    const balanceFactor = this.getBalanceFactor(node) // {2}
+    const balanceFactor = this.getBalanceFactor(node)
     if (balanceFactor === BalanceFactor.UNBALANCED_LEFT) {
-      // {3}
-      const balanceFactorLeft = this.getBalanceFactor(node.left) // {4}
+      const balanceFactorLeft = this.getBalanceFactor(node.left)
       if (
         balanceFactorLeft === BalanceFactor.BALANCED ||
         balanceFactorLeft === BalanceFactor.SLIGHTLY_UNBALANCED_LEFT
       ) {
-        // {5}
-        return this.rotationLL(node) // {6}
+        return this.rotationLL(node)
       }
       if (balanceFactorLeft === BalanceFactor.SLIGHTLY_UNBALANCED_RIGHT) {
-        // {7}
-        return this.rotationLR(node.left) // {8}
+        return this.rotationLR(node.left)
       }
     }
     if (balanceFactor === BalanceFactor.UNBALANCED_RIGHT) {
-      // {9}
       const balanceFactorRight = this.getBalanceFactor(node.right) // {10}
       if (
         balanceFactorRight === BalanceFactor.BALANCED ||
         balanceFactorRight === BalanceFactor.SLIGHTLY_UNBALANCED_RIGHT
       ) {
-        // {11}
-        return this.rotationRR(node) // {12}
+        return this.rotationRR(node)
       }
       if (balanceFactorRight === BalanceFactor.SLIGHTLY_UNBALANCED_LEFT) {
-        // {13}
-        return this.rotationRL(node.right) // {14}
+        return this.rotationRL(node.right)
       }
     }
     return node
   }
 }
-
-const tree = new AVLTree()
-tree.insert(11)
-
-tree.insert(7)
-tree.insert(15)
-tree.insert(5)
-tree.insert(3)
-tree.insert(9)
-tree.insert(8)
-tree.insert(10)
-tree.insert(13)
-tree.insert(12)
-tree.insert(14)
-tree.insert(20)
-tree.insert(18)
-tree.insert(25)
-console.log(tree)
