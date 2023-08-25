@@ -2,10 +2,10 @@
  * @Author: lihuan
  * @Date: 2023-08-23 16:43:51
  * @LastEditors: lihuan
- * @LastEditTime: 2023-08-24 15:15:42
+ * @LastEditTime: 2023-08-25 15:36:01
  * @Description: 树
  */
-import { Compare, defaultCompare } from './util.js'
+import { BalanceFactor, Compare, defaultCompare } from './util.js'
 
 class Node {
   constructor(key) {
@@ -152,9 +152,121 @@ export class AVLTree extends BinarySearchTree {
       Math.max(this.getNodeHight(node.left), this.getNodeHight(node.right)) + 1
     )
   }
+  getBalanceFactor(node) {
+    const heightDifference =
+      this.getNodeHight(node.left) - this.getNodeHight(this.right)
+    switch (heightDifference) {
+      case -2:
+        return BalanceFactor.UNBALANCED_RIGHT
+      case -1:
+        return BalanceFactor.SLIGHTLY_UNBALANCED_RIGHT
+      case 1:
+        return BalanceFactor.SLIGHTLY_UNBALANCED_LEFT
+      case 2:
+        return BalanceFactor.UNBALANCED_LEFT
+      default:
+        return BalanceFactor.BALANCED
+    }
+  }
+  // LL旋转
+  rotationLL(node) {
+    const tmp = node.left
+    node.left = tmp.right
+    tmp.right = node
+    return tmp
+  }
+  // RR旋转
+  rotationRR(node) {
+    const tmp = node.right
+    node.right = tmp.left
+    tmp.left = node
+    return tmp
+  }
+  //LR旋转
+  rotationLR(node) {
+    node.left = this.rotationRR(node.left)
+    return this.rotationLL(node)
+  }
+  //RL旋转
+  rotationRL(node) {
+    node.right = this.rotationLL(node.right)
+    return this.rotationRR(node)
+  }
+  insert(key) {
+    this.root = this.insertNode(this.root, key)
+  }
+  insertNode(node, key) {
+    if (node == null) {
+      return new Node(key)
+    } else if (this.compareFn(key, node.key) === Compare.LESS_THAN) {
+      node.left = this.insertNode(node.left, key)
+    } else if (this.compareFn(key, node.key) === Compare.BIGGER_THAN) {
+      node.right = this.insertNode(node.right, key)
+    } else {
+      // 重复的键
+      return node
+    }
+    const balanceFactor = this.getBalanceFactor(node)
+    if (balanceFactor === BalanceFactor.UNBALANCED_LEFT) {
+      if (this.compareFn(key, node.left.key) === Compare.LESS_THAN) {
+        node = this.rotationLL(node)
+      } else {
+        node = this.rotationLR(node)
+      }
+    }
+
+    if (balanceFactor === BalanceFactor.UNBALANCED_RIGHT) {
+      if (this.compareFn(key, node.right.key) === Compare.BIGGER_THAN) {
+        node = this.rotationRR(node)
+      } else {
+        node = this.rotationRL(node)
+      }
+    }
+
+    return node
+  }
+  removeNode(node, key) {
+    node = super.removeNode(node, key) // {1}
+    if (node == null) {
+      return node // null，不需要进行平衡
+    }
+    // 检测树是否平衡
+    const balanceFactor = this.getBalanceFactor(node) // {2}
+    if (balanceFactor === BalanceFactor.UNBALANCED_LEFT) {
+      // {3}
+      const balanceFactorLeft = this.getBalanceFactor(node.left) // {4}
+      if (
+        balanceFactorLeft === BalanceFactor.BALANCED ||
+        balanceFactorLeft === BalanceFactor.SLIGHTLY_UNBALANCED_LEFT
+      ) {
+        // {5}
+        return this.rotationLL(node) // {6}
+      }
+      if (balanceFactorLeft === BalanceFactor.SLIGHTLY_UNBALANCED_RIGHT) {
+        // {7}
+        return this.rotationLR(node.left) // {8}
+      }
+    }
+    if (balanceFactor === BalanceFactor.UNBALANCED_RIGHT) {
+      // {9}
+      const balanceFactorRight = this.getBalanceFactor(node.right) // {10}
+      if (
+        balanceFactorRight === BalanceFactor.BALANCED ||
+        balanceFactorRight === BalanceFactor.SLIGHTLY_UNBALANCED_RIGHT
+      ) {
+        // {11}
+        return this.rotationRR(node) // {12}
+      }
+      if (balanceFactorRight === BalanceFactor.SLIGHTLY_UNBALANCED_LEFT) {
+        // {13}
+        return this.rotationRL(node.right) // {14}
+      }
+    }
+    return node
+  }
 }
 
-const tree = new BinarySearchTree()
+const tree = new AVLTree()
 tree.insert(11)
 
 tree.insert(7)
@@ -170,4 +282,4 @@ tree.insert(14)
 tree.insert(20)
 tree.insert(18)
 tree.insert(25)
-console.log(tree.search(60))
+console.log(tree)
